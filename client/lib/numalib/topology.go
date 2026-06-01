@@ -191,6 +191,17 @@ func (st *Topology) NodeCores(node hw.NodeID) *idset.Set[hw.CoreID] {
 }
 
 func (st *Topology) insert(node hw.NodeID, socket hw.SocketID, core hw.CoreID, grade CoreGrade, max, base hw.KHz) {
+	// Defensive: on virtualized Apple Silicon hosts (e.g. Bitrise
+	// g2.mac.large CI workers) the m1cpu library can report core
+	// counts that disagree with the size scanAppleSilicon allocated
+	// up front, which manifests as a "panic: runtime error: index
+	// out of range" on agent startup. Grow the slice rather than
+	// panic — the caller-miscount is rare and harmless to absorb.
+	if int(core) >= len(st.Cores) {
+		grown := make([]Core, int(core)+1)
+		copy(grown, st.Cores)
+		st.Cores = grown
+	}
 	st.Cores[core] = Core{
 		NodeID:    node,
 		SocketID:  socket,
